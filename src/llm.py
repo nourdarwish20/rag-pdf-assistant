@@ -6,19 +6,26 @@ from huggingface_hub import InferenceClient
 
 from src.config import (
     OLLAMA_MODEL,
-    OLLAMA_URL,
-    HF_MODEL
+    OLLAMA_BASE_URL,
+    OLLAMA_TEMPERATURE,
+    HF_MODEL,
 )
 
 load_dotenv(override=True)
 
+
 def generate_answer_ollama(prompt):
+    """Generate an answer using local Ollama."""
+
     response = requests.post(
-        OLLAMA_URL,
+        f"{OLLAMA_BASE_URL}/api/generate",
         json={
             "model": OLLAMA_MODEL,
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "options": {
+                "temperature": OLLAMA_TEMPERATURE
+            }
         }
     )
 
@@ -28,6 +35,8 @@ def generate_answer_ollama(prompt):
 
 
 def generate_answer_hf(prompt):
+    """Generate an answer using Hugging Face."""
+
     token = os.getenv("HF_TOKEN")
 
     if not token:
@@ -54,6 +63,8 @@ def generate_answer_hf(prompt):
 
 
 def generate_answer(prompt, provider="ollama"):
+    """Choose which LLM provider to use."""
+
     if provider == "huggingface":
         return generate_answer_hf(prompt)
 

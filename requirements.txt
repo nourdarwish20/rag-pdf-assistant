@@ -4,5 +4,11 @@ sentence-transformers
 faiss-cpu
 huggingface-hub
 python-dotenv
+torch
 numpy
 requests
+langchain
+langchain-community
+langchain-core
+langchain-text-splitters
+langchain-huggingface

@@ -1,53 +1,131 @@
-import faiss
-import numpy as np
-from sentence_transformers import SentenceTransformer
+import os
+from typing import List, Optional
 
-from src.config import EMBEDDING_MODEL, TOP_K
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.documents import Document
+
+from src.config import (
+    EMBEDDING_MODEL_NAME,
+    EMBEDDING_DEVICE,
+    VECTOR_DB_DIR,
+)
 
 
-# Load the embedding model once
-embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+def get_embeddings() -> HuggingFaceEmbeddings:
+    """Load the embedding model."""
 
-
-def create_vector_store(chunks):
-    """
-    Convert chunks into embeddings and store them in FAISS.
-    """
-
-    embeddings = embedding_model.encode(
-        chunks,
-        normalize_embeddings=True
+    return HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL_NAME,
+        model_kwargs={
+            "device": EMBEDDING_DEVICE
+        },
+        encode_kwargs={
+            "normalize_embeddings": True
+        }
     )
 
-    embeddings = np.array(embeddings).astype("float32")
 
-    dimension = embeddings.shape[1]
+def create_vector_store(
+    documents: List[Document]
+) -> FAISS:
+    """Create a new FAISS vector store."""
 
-    index = faiss.IndexFlatIP(dimension)
+    embeddings = get_embeddings()
 
-    index.add(embeddings)
-
-    return index
-
-
-def search_vector_store(index, chunks, query, top_k=TOP_K):
-    """
-    Search FAISS and return the most relevant chunks.
-    """
-
-    query_embedding = embedding_model.encode(
-        [query],
-        normalize_embeddings=True
+    vectorstore = FAISS.from_documents(
+        documents,
+        embeddings
     )
 
-    query_embedding = np.array(query_embedding).astype("float32")
+    return vectorstore
 
-    scores, indices = index.search(query_embedding, top_k)
 
-    results = []
+def save_vector_store(
+    vectorstore: FAISS
+) -> None:
+    """Save FAISS locally."""
 
-    for i in indices[0]:
-        if i != -1:
-            results.append(chunks[i])
+    vectorstore.save_local(
+        str(VECTOR_DB_DIR)
+    )
 
-    return results
+
+def load_vector_store() -> Optional[FAISS]:
+    """Load an existing FAISS vector store."""
+
+    index_file = VECTOR_DB_DIR / "index.faiss"
+
+    if not index_file.exists():
+        return None
+
+    embeddings = get_embeddings()
+
+    return FAISS.load_local(
+        str(VECTOR_DB_DIR),
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+
+
+def get_existing_sources(
+    vectorstore: FAISS
+) -> set:
+    """Get PDF files already stored."""
+
+    sources = set()
+
+    for document in vectorstore.docstore._dict.values():
+
+        source = document.metadata.get("source")
+
+        if source:
+            source = os.path.abspath(source)
+            sources.add(source)
+
+    return sources
+
+
+def update_vector_store(
+    documents: List[Document]
+) -> FAISS:
+    """Create or update the vector store."""
+
+    vectorstore = load_vector_store()
+
+    if vectorstore is None:
+
+        vectorstore = create_vector_store(
+            documents
+        )
+
+    else:
+
+        existing_sources = get_existing_sources(
+            vectorstore
+        )
+
+        new_documents = []
+
+        for document in documents:
+
+            source = document.metadata.get(
+                "source"
+            )
+
+            if source:
+                source = os.path.abspath(source)
+
+                if source in existing_sources:
+                    continue
+
+            new_documents.append(document)
+
+        if new_documents:
+            vectorstore.add_documents(
+                new_documents
+            )
+
+    save_vector_store(vectorstore)
+
+    return vectorstore
