@@ -1,0 +1,7 @@
+gradio
+pypdf
+sentence-transformers
+faiss-cpu
+huggingface-hub
+python-dotenv
+numpy
