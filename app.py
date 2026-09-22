@@ -7,6 +7,32 @@ from src.rag import answer_question, is_follow_up
 
 
 # ------------------------------------------------
+# ZeroGPU compatibility
+# ------------------------------------------------
+
+# ZeroGPU refuses to start unless it finds a function marked
+# with @spaces.GPU. This app never needs a GPU: embeddings run
+# on the CPU and the LLM runs on Hugging Face's servers. The
+# probe below exists only to satisfy that startup check and is
+# never called.
+#
+# "spaces" is preinstalled on Hugging Face Spaces but not
+# locally, so the import is guarded to keep "python app.py"
+# working on a normal machine.
+
+try:
+    import spaces
+
+    @spaces.GPU(duration=1)
+    def _zerogpu_probe():
+        """Unused. Present only for ZeroGPU startup detection."""
+        return None
+
+except ImportError:
+    pass
+
+
+# ------------------------------------------------
 # PDF Upload
 # ------------------------------------------------
 
