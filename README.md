@@ -11,7 +11,7 @@ pinned: false
 
 # RAG PDF Assistant
 
-[Live Demo on Hugging Face Spaces](ADD_LINK_AFTER_DEPLOYMENT)
+[[Live Demo on Hugging Face Spaces](ADD_LINK_AFTER_DEPLOYMENT)](https://huggingface.co/spaces/no2004/rag-pdf-assistant)
 
 Ask questions about your own PDF files and get answers taken from the
 document itself, with the page numbers they came from.
@@ -214,7 +214,7 @@ Local testing was successful, with PDF-backed answers returning in a
 few seconds and the Exa fallback taking longer because it adds a web
 search and a second model call.
 
-**Live Hugging Face API latency: TO BE MEASURED AFTER DEPLOYMENT**
+Live Hugging Face API latency: 2.25 seconds
 
 ## Limitations
 
