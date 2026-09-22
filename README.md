@@ -1,12 +1,3 @@
----
-title: RAG PDF Assistant
-emoji: 📄
-sdk: gradio
-sdk_version: 6.28.0
-app_file: app.py
-pinned: false
----
-
 # 📄 RAG PDF Assistant
 
 ### 🚀 [Live Demo on Hugging Face Spaces](https://huggingface.co/spaces/no2004/rag-pdf-assistant)
