@@ -23,7 +23,7 @@ Answer:
     return prompt
 
 
-def answer_question(index, chunks, question):
+def answer_question(index, chunks, question, provider="ollama"):
     relevant_chunks = search_vector_store(
         index,
         chunks,
@@ -35,6 +35,9 @@ def answer_question(index, chunks, question):
         relevant_chunks
     )
 
-    answer = generate_answer(prompt)
+    answer = generate_answer(
+        prompt,
+        provider=provider
+    )
 
     return answer

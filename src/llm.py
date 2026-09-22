@@ -1,9 +1,18 @@
+import os
 import requests
 
-from src.config import OLLAMA_MODEL, OLLAMA_URL
+from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
 
+from src.config import (
+    OLLAMA_MODEL,
+    OLLAMA_URL,
+    HF_MODEL
+)
 
-def generate_answer(prompt):
+load_dotenv(override=True)
+
+def generate_answer_ollama(prompt):
     response = requests.post(
         OLLAMA_URL,
         json={
@@ -16,3 +25,36 @@ def generate_answer(prompt):
     response.raise_for_status()
 
     return response.json()["response"]
+
+
+def generate_answer_hf(prompt):
+    token = os.getenv("HF_TOKEN")
+
+    if not token:
+        raise ValueError("HF_TOKEN was not found.")
+
+    client = InferenceClient(
+        provider="auto",
+        api_key=token
+    )
+
+    response = client.chat.completions.create(
+        model=HF_MODEL,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        max_tokens=300,
+        temperature=0.1
+    )
+
+    return response.choices[0].message.content
+
+
+def generate_answer(prompt, provider="ollama"):
+    if provider == "huggingface":
+        return generate_answer_hf(prompt)
+
+    return generate_answer_ollama(prompt)
