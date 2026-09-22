@@ -1,14 +1,21 @@
-gradio
-pypdf
-sentence-transformers
-faiss-cpu
-huggingface-hub
-python-dotenv
-torch
-numpy
-requests
-langchain
-langchain-community
-langchain-core
-langchain-text-splitters
-langchain-huggingface
+# UI
+gradio==6.28.0
+
+# PDF loading and chunking
+pypdf==6.19.0
+langchain==1.4.2
+langchain-community==0.4.2
+langchain-core==1.6.4
+langchain-text-splitters==1.1.2
+
+# Embeddings and vector search
+langchain-huggingface==1.2.2
+sentence-transformers==6.1.0
+faiss-cpu==1.15.1
+torch==2.14.0
+numpy==2.5.3
+
+# LLM inference and config
+huggingface-hub==1.32.0
+python-dotenv==1.2.3
+requests==2.34.2

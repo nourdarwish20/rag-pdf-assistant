@@ -11,10 +11,6 @@ from src.vector_store import (
 from src.rag import answer_question
 
 
-# Hugging Face is used for the deployed app
-APP_PROVIDER = "huggingface"
-
-
 # ------------------------------------------------
 # PDF Upload
 # ------------------------------------------------
@@ -100,8 +96,7 @@ def chat(message, history):
 
             result = answer_question(
                 vectorstore,
-                message,
-                provider=APP_PROVIDER
+                message
             )
 
             answer = result["answer"]

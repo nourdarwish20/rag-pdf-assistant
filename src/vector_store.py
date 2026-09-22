@@ -80,7 +80,7 @@ def get_existing_sources(
         source = document.metadata.get("source")
 
         if source:
-            source = os.path.abspath(source)
+            source = os.path.basename(source)
             sources.add(source)
 
     return sources
@@ -114,7 +114,7 @@ def update_vector_store(
             )
 
             if source:
-                source = os.path.abspath(source)
+                source = os.path.basename(source)
 
                 if source in existing_sources:
                     continue

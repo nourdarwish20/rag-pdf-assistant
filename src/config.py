@@ -84,7 +84,9 @@ HF_MODEL = os.getenv(
 # LLM Provider
 # -------------------------
 
+# "huggingface" is the deployed default; set
+# LLM_PROVIDER=ollama in .env for local testing.
 LLM_PROVIDER = os.getenv(
     "LLM_PROVIDER",
-    "ollama"
+    "huggingface"
 )
