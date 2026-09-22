@@ -129,3 +129,38 @@ def update_vector_store(
     save_vector_store(vectorstore)
 
     return vectorstore
+
+
+def update_session_store(
+    vectorstore: Optional[FAISS],
+    documents: List[Document]
+) -> FAISS:
+    """Create or extend one user's private in-memory store.
+
+    Nothing is written to disk, so two visitors never share
+    their PDFs. Same-file dedup still applies inside a session.
+    """
+
+    if vectorstore is None:
+        return create_vector_store(documents)
+
+    existing_sources = get_existing_sources(vectorstore)
+
+    new_documents = []
+
+    for document in documents:
+
+        source = document.metadata.get("source")
+
+        if source:
+            source = os.path.basename(source)
+
+            if source in existing_sources:
+                continue
+
+        new_documents.append(document)
+
+    if new_documents:
+        vectorstore.add_documents(new_documents)
+
+    return vectorstore

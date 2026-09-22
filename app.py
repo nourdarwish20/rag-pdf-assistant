@@ -1,13 +1,8 @@
 import os
-import shutil
 import gradio as gr
 
-from src.config import INPUTS_DIR
 from src.ingest import ingest_file
-from src.vector_store import (
-    update_vector_store,
-    load_vector_store,
-)
+from src.vector_store import update_session_store
 from src.rag import answer_question
 
 
@@ -15,11 +10,11 @@ from src.rag import answer_question
 # PDF Upload
 # ------------------------------------------------
 
-def process_upload(files):
-    """Save uploaded PDFs and add them to FAISS."""
+def process_upload(files, session_store):
+    """Save uploaded PDFs into this session's own store."""
 
     if not files:
-        return "Please select at least one PDF."
+        return "Please select at least one PDF.", session_store
 
     if not isinstance(files, list):
         files = [files]
@@ -38,18 +33,8 @@ def process_upload(files):
 
             filename = os.path.basename(file_path)
 
-            save_path = INPUTS_DIR / filename
-
-            # Save PDF
-            shutil.copy2(
-                file_path,
-                save_path
-            )
-
-            # PDF → LangChain chunks
-            documents = ingest_file(
-                str(save_path)
-            )
+            # PDF -> LangChain chunks
+            documents = ingest_file(file_path)
 
             all_documents.extend(documents)
 
@@ -57,102 +42,111 @@ def process_upload(files):
                 f"✓ {filename}: {len(documents)} chunks"
             )
 
-        # Add documents to FAISS
-        vectorstore = update_vector_store(
+        # Add documents to this session's FAISS store
+        session_store = update_session_store(
+            session_store,
             all_documents
         )
 
         status_messages.append(
             f"\n✓ Knowledge base ready"
-            f"\n{vectorstore.index.ntotal} vectors stored"
+            f"\n{session_store.index.ntotal} vectors stored"
         )
 
-        return "\n".join(status_messages)
+        return "\n".join(status_messages), session_store
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error: {str(e)}", session_store
 
 
 # ------------------------------------------------
 # Chat
 # ------------------------------------------------
 
-def chat(message, history):
+def format_sources(documents):
+    """Turn retrieved documents into readable source lines."""
+
+    source_lines = []
+
+    for document in documents:
+
+        source = document.metadata.get(
+            "source",
+            "Unknown"
+        )
+
+        page = document.metadata.get("page")
+
+        source_name = os.path.basename(source)
+
+        if page is not None:
+            source_line = (
+                f"📄 {source_name} · "
+                f"Page {page + 1}"
+            )
+        else:
+            source_line = f"📄 {source_name}"
+
+        if source_line not in source_lines:
+            source_lines.append(source_line)
+
+    return source_lines
+
+
+def ask(question, session_store):
+    """Answer one question. This is the API endpoint."""
+
+    if not question or not question.strip():
+        return {
+            "answer": None,
+            "sources": [],
+            "error": "Question is empty."
+        }
+
+    if session_store is None:
+        return {
+            "answer": None,
+            "sources": [],
+            "error": "No PDF has been uploaded in this session yet."
+        }
+
+    try:
+        result = answer_question(session_store, question)
+
+        return {
+            "answer": result["answer"],
+            "sources": format_sources(result["sources"]),
+            "error": None
+        }
+
+    except Exception as e:
+        return {
+            "answer": None,
+            "sources": [],
+            "error": str(e)
+        }
+
+
+def chat(message, history, session_store):
     """Run the RAG pipeline and update chat history."""
 
     if not message.strip():
         return history, ""
 
-    try:
-        vectorstore = load_vector_store()
+    result = ask(message, session_store)
 
-        if vectorstore is None:
+    if result["error"]:
+        assistant_message = result["error"]
 
-            assistant_message = (
-                "Please upload and process a PDF first."
-            )
-
-        else:
-
-            result = answer_question(
-                vectorstore,
-                message
-            )
-
-            answer = result["answer"]
-
-            # Build source list
-            source_lines = []
-
-            for document in result["sources"]:
-
-                source = document.metadata.get(
-                    "source",
-                    "Unknown"
-                )
-
-                page = document.metadata.get(
-                    "page"
-                )
-
-                source_name = os.path.basename(
-                    source
-                )
-
-                if page is not None:
-                    source_line = (
-                        f"📄 {source_name} · "
-                        f"Page {page + 1}"
-                    )
-                else:
-                    source_line = (
-                        f"📄 {source_name}"
-                    )
-
-                if source_line not in source_lines:
-                    source_lines.append(
-                        source_line
-                    )
-
-            if source_lines:
-
-                sources = "\n".join(
-                    source_lines
-                )
-
-                assistant_message = (
-                    f"{answer}\n\n"
-                    f"**Sources**\n{sources}"
-                )
-
-            else:
-                assistant_message = answer
-
-    except Exception as e:
-
+    elif result["sources"]:
+        sources = "\n".join(result["sources"])
         assistant_message = (
-            f"Something went wrong: {str(e)}"
+            f"{result['answer']}\n\n"
+            f"**Sources**\n{sources}"
         )
+
+    else:
+        assistant_message = result["answer"]
 
     history.append(
         {
@@ -279,6 +273,10 @@ with gr.Blocks(
     title="RAG PDF Assistant"
 ) as demo:
 
+    # One private, in-memory vector store per visitor.
+    # Nothing is shared between sessions.
+    session_store = gr.State(None)
+
     # Header
 
     gr.Markdown(
@@ -383,37 +381,68 @@ with gr.Blocks(
 
     process_button.click(
         fn=process_upload,
-        inputs=pdf_files,
-        outputs=status
+        inputs=[
+            pdf_files,
+            session_store
+        ],
+        outputs=[
+            status,
+            session_store
+        ],
+        api_name="upload"
     )
 
     send_button.click(
         fn=chat,
         inputs=[
             message,
-            chatbot
+            chatbot,
+            session_store
         ],
         outputs=[
             chatbot,
             message
-        ]
+        ],
+        api_name=False
     )
 
     message.submit(
         fn=chat,
         inputs=[
             message,
-            chatbot
+            chatbot,
+            session_store
         ],
         outputs=[
             chatbot,
             message
-        ]
+        ],
+        api_name=False
     )
 
     clear_button.click(
         fn=clear_chat,
-        outputs=chatbot
+        outputs=chatbot,
+        api_name=False
+    )
+
+    # ----------------------------------------
+    # API endpoint: /ask
+    # Hidden from the UI, callable from code.
+    # ----------------------------------------
+
+    api_question = gr.Textbox(visible=False)
+    api_answer = gr.JSON(visible=False)
+    api_trigger = gr.Button(visible=False)
+
+    api_trigger.click(
+        fn=ask,
+        inputs=[
+            api_question,
+            session_store
+        ],
+        outputs=api_answer,
+        api_name="ask"
     )
 
     # Footer

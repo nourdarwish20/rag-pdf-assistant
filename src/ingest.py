@@ -52,7 +52,6 @@ def ingest_file(file_path: str) -> List[Document]:
     """Load and split one PDF."""
 
     documents = load_pdf(file_path)
-
     return split_documents(documents)
 
 
