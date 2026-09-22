@@ -3,7 +3,7 @@ import gradio as gr
 
 from src.ingest import ingest_file
 from src.vector_store import update_session_store
-from src.rag import answer_question
+from src.rag import answer_question, is_follow_up
 
 
 # ------------------------------------------------
@@ -93,13 +93,89 @@ def format_sources(documents):
     return source_lines
 
 
-def ask(question, session_store):
+def message_text(content):
+    """Get the plain text out of one chat message.
+
+    This app writes content as a string, but Gradio sends it
+    back from the browser as a list of parts.
+    """
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+
+        parts = []
+
+        for part in content:
+
+            if isinstance(part, str):
+                parts.append(part)
+
+            elif isinstance(part, dict) and part.get("type") == "text":
+                parts.append(part.get("text", ""))
+
+        return "\n".join(parts)
+
+    return ""
+
+
+def last_turn(history):
+    """Get the topic question and the previous answer.
+
+    The topic is the most recent question that actually named a
+    subject. "i meant in the cake" points back at the vanilla
+    cake, not at the message just before it.
+    """
+
+    previous_question = None
+    previous_answer = None
+    recent_question = None
+
+    for entry in reversed(history or []):
+
+        if not isinstance(entry, dict):
+            continue
+
+        role = entry.get("role")
+        text = message_text(entry.get("content"))
+
+        if previous_answer is None and role == "assistant":
+            previous_answer = text
+
+        elif role == "user" and text:
+
+            if recent_question is None:
+                recent_question = text
+
+            if previous_question is None and not is_follow_up(text):
+                previous_question = text
+
+    # Every message so far was a follow-up: use the newest one.
+    if previous_question is None:
+        previous_question = recent_question
+
+    # A correction ("i meant in the cake") needs both the topic and
+    # the question being corrected, or words like "lemon" are lost.
+    elif recent_question and recent_question != previous_question:
+        previous_question = f"{previous_question} {recent_question}"
+
+    if previous_answer:
+        # Drop the "**Sources**" block appended for display.
+        previous_answer = previous_answer.split("\n\n**")[0].strip()
+
+    return previous_question, previous_answer
+
+
+def ask(question, session_store,
+        previous_question=None, previous_answer=None):
     """Answer one question. This is the API endpoint."""
 
     if not question or not question.strip():
         return {
             "answer": None,
             "sources": [],
+            "from_web": False,
             "error": "Question is empty."
         }
 
@@ -107,15 +183,30 @@ def ask(question, session_store):
         return {
             "answer": None,
             "sources": [],
+            "from_web": False,
             "error": "No PDF has been uploaded in this session yet."
         }
 
     try:
-        result = answer_question(session_store, question)
+        result = answer_question(
+            session_store,
+            question,
+            previous_question=previous_question,
+            previous_answer=previous_answer
+        )
+
+        if result["from_web"]:
+            sources = [
+                f"🌐 {r['title']} - {r['url']}"
+                for r in result["web_sources"]
+            ]
+        else:
+            sources = format_sources(result["sources"])
 
         return {
             "answer": result["answer"],
-            "sources": format_sources(result["sources"]),
+            "sources": sources,
+            "from_web": result["from_web"],
             "error": None
         }
 
@@ -123,6 +214,7 @@ def ask(question, session_store):
         return {
             "answer": None,
             "sources": [],
+            "from_web": False,
             "error": str(e)
         }
 
@@ -133,16 +225,30 @@ def chat(message, history, session_store):
     if not message.strip():
         return history, ""
 
-    result = ask(message, session_store)
+    previous_question, previous_answer = last_turn(history)
+
+    result = ask(
+        message,
+        session_store,
+        previous_question,
+        previous_answer
+    )
 
     if result["error"]:
         assistant_message = result["error"]
 
     elif result["sources"]:
         sources = "\n".join(result["sources"])
+
+        label = (
+            "**Answered from the web** (not found in your PDF)"
+            if result["from_web"]
+            else "**Sources**"
+        )
+
         assistant_message = (
             f"{result['answer']}\n\n"
-            f"**Sources**\n{sources}"
+            f"{label}\n{sources}"
         )
 
     else:

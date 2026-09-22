@@ -90,3 +90,16 @@ LLM_PROVIDER = os.getenv(
     "LLM_PROVIDER",
     "huggingface"
 )
+
+
+# -------------------------
+# Exa - Web Search Fallback
+# -------------------------
+
+# Used only when the PDF cannot answer the question.
+EXA_API_KEY = os.getenv("EXA_API_KEY")
+
+# "fast" keeps the fallback quick. Never a deep search type.
+EXA_SEARCH_TYPE = os.getenv("EXA_SEARCH_TYPE", "fast")
+
+EXA_NUM_RESULTS = int(os.getenv("EXA_NUM_RESULTS", "3"))
