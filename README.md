@@ -111,6 +111,13 @@ cp .env.example .env
 ```bash
 python app.py
 ```
+```md
+## 🐳 Run with Docker
+
+Build the image:
+
+```bash
+docker build -t rag-pdf-assistant .
 
 This opens a local URL (e.g. `http://127.0.0.1:7860`).
 
