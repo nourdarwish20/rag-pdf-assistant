@@ -111,15 +111,29 @@ cp .env.example .env
 ```bash
 python app.py
 ```
-```md
+
+This opens a local URL (e.g. `http://127.0.0.1:7860`).
+
+---
+
 ## 🐳 Run with Docker
 
 Build the image:
 
 ```bash
 docker build -t rag-pdf-assistant .
+```
 
-This opens a local URL (e.g. `http://127.0.0.1:7860`).
+Run the container, passing your secrets from `.env` at runtime:
+
+```bash
+docker run -p 7860:7860 --env-file .env rag-pdf-assistant
+```
+
+Then open `http://localhost:7860`.
+
+> [!NOTE]
+> The image installs a CPU-only build of PyTorch to keep it small. `.env` is excluded from the image, so your keys are never baked in.
 
 ---
 

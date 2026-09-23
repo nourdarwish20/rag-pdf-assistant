@@ -12,46 +12,26 @@ from src.web_search import search_web
 # Seeing it is what triggers the web fallback.
 NOT_IN_DOCUMENT = "I don't know based on the provided document."
 
-# Openings that continue or correct the previous message.
-FOLLOW_UP_PHRASES = (
+# Whole messages that only make sense after a previous answer.
+FOLLOW_UP_MESSAGES = {
     "explain more",
-    "explain",
-    "more detail",
-    "more",
-    "elaborate",
-    "continue",
-    "go on",
-    "why",
     "tell me more",
-    "i mean",
-    "i meant",
-    "what about",
-    "how about",
-    "can i add",
-    "can i put",
-    "can i use",
-    "can i replace",
-    "is it",
-    "does it",
-    "and ",
-    "also",
-)
-
-# Words that point at something said earlier instead of naming it.
-REFERENCE_WORDS = {
-    "it",
-    "its",
-    "that",
-    "this",
-    "them",
-    "they",
-    "their",
-    "these",
-    "those",
+    "more",
+    "why",
+    "elaborate",
 }
 
-# A reference word only means a follow-up in a short message.
-MAX_REFERENCE_WORDS = 12
+# Openings that point back at the previous answer
+# ("what about that?", "i meant in the cake", "can i add lemon?").
+FOLLOW_UP_OPENINGS = (
+    "what about",
+    "how about",
+    "i mean",
+    "i meant",
+    "can i add",
+    "can i put",
+    "can i replace",
+)
 
 
 def get_retriever(vectorstore) -> BaseRetriever:
@@ -66,28 +46,21 @@ def get_retriever(vectorstore) -> BaseRetriever:
 
 
 def is_follow_up(question: str) -> bool:
-    """True when a message leans on what was said before.
+    """True only for obvious follow-ups like "explain more" or "why?".
 
-    Covers three cases: short replies ("explain more"),
-    corrections ("i meant in the cake") and references
-    ("can i put lemon in it?").
+    Everything else, including short questions like "What is RAG?",
+    is treated as a new, standalone question.
     """
 
-    text = question.strip().lower().rstrip("?.!")
+    text = " ".join(re.findall(r"[a-z']+", question.lower()))
 
-    if text.startswith(FOLLOW_UP_PHRASES):
+    if text in FOLLOW_UP_MESSAGES:
         return True
 
-    words = re.findall(r"[a-z']+", text)
-
-    if len(words) <= 3:
-        return True
-
-    if len(words) <= MAX_REFERENCE_WORDS:
-        if any(word in REFERENCE_WORDS for word in words):
-            return True
-
-    return False
+    return any(
+        text == opening or text.startswith(opening + " ")
+        for opening in FOLLOW_UP_OPENINGS
+    )
 
 
 def build_search_query(

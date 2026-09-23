@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 from typing import List, Optional
 
 from langchain_community.vectorstores import FAISS
@@ -12,8 +13,9 @@ from src.config import (
 )
 
 
+@lru_cache(maxsize=1)
 def get_embeddings() -> HuggingFaceEmbeddings:
-    """Load the embedding model."""
+    """Load the embedding model once and reuse it for every upload."""
 
     return HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,
