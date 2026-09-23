@@ -184,9 +184,14 @@ The user's PDF did not contain the answer, so here are web results.
 
 Rules:
 - Use only the web results below.
+- The question may contain typos (e.g. "recope" means "recipe").
+  Answer what the user clearly meant, not the literal spelling.
 - Answer only the question asked. Stay on its topic.
-- Keep the answer short: at most four sentences.
-- If the results do not answer it, say you could not find it.
+- If any result answers it, use that result, even if it is only
+  one example (e.g. one recipe when the user asked for "a recipe").
+- Keep the answer short: at most four sentences, or a short list
+  when the answer is steps or ingredients.
+- Only if no result is relevant, say you could not find it.
 {topic_line}
 Web results:
 {context}

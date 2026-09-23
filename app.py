@@ -1,4 +1,5 @@
 import os
+import re
 import gradio as gr
 
 from src.ingest import ingest_file
@@ -193,6 +194,24 @@ def last_turn(history):
     return previous_question, previous_answer
 
 
+GREETINGS = {
+    "hi", "hii", "hey", "hello", "helo", "hallo", "hiya", "yo",
+    "hi there", "hello there", "hey there",
+    "good morning", "good afternoon", "good evening",
+    "salam", "marhaba", "ahlan",
+}
+
+GREETING_REPLY = "Hi! 👋 How can I help you?"
+
+
+def is_greeting(message):
+    """True when the message is only a greeting, like "hi" or "Hello!"."""
+
+    text = re.sub(r"[^\w\s]", "", message.lower()).strip()
+
+    return " ".join(text.split()) in GREETINGS
+
+
 def ask(question, session_store,
         previous_question=None, previous_answer=None):
     """Answer one question. This is the API endpoint."""
@@ -203,6 +222,15 @@ def ask(question, session_store,
             "sources": [],
             "from_web": False,
             "error": "Question is empty."
+        }
+
+    # Greetings get a friendly reply, with or without a PDF.
+    if is_greeting(question):
+        return {
+            "answer": GREETING_REPLY,
+            "sources": [],
+            "from_web": False,
+            "error": None
         }
 
     if session_store is None:
